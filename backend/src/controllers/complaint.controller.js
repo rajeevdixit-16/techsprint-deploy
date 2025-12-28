@@ -116,3 +116,100 @@ export const getAllComplaints = asyncHandler(async (req, res) => {
     new ApiResponse(200, complaints, "Complaints fetched successfully")
   );
 });
+
+// Get ward complaints (authority)
+
+export const getWardComplaints = asyncHandler(async(req,res) => {
+    const user = req.user;
+
+    if(user.role !== "authority"){
+        throw new ApiError(403,"Access Denied");
+    }
+
+    const complaints = await Complaint.find({
+        wardId: user.wardId
+    }).sort({priorityScore: -1, createdAt: -1});
+
+    res.json(
+        new ApiResponse(200, complaints,"Ward complaints fetched successfully")
+    );
+});
+
+// get single complaint
+
+export const getComplaintById = asyncHandler(async(req,res)=>{
+    const {complaintId} = req.params;
+
+    const complaint = await Complaint.findById(complaintId)
+        .populate("reportedBy","name email")
+        .populate("wardId","name city");
+
+    if(!complaint){
+        throw new ApiError(404,"Complaint not found");
+    }
+
+    res.json(
+        new ApiResponse(200,complaint,"Complaint fetched successfully")
+    );
+});
+
+// Update complaint status 
+
+export const updateComplaintStatus = asyncHandler(async (req, res) => {
+  const user = req.user;
+  const { complaintId } = req.params;
+  const { status, authorityRemarks, afterFixImageUrl } = req.body;
+
+  if (user.role !== "authority") {
+    throw new ApiError(403, "Only authorities can update complaints");
+  }
+
+  const complaint = await Complaint.findById(complaintId);
+
+  if (!complaint) {
+    throw new ApiError(404, "Complaint not found");
+  }
+
+  if (!complaint.wardId.equals(user.wardId)) {
+    throw new ApiError(403, "Not authorized to update this complaint");
+  }
+
+  complaint.status = status;
+  complaint.authorityRemarks = authorityRemarks || complaint.authorityRemarks;
+
+  if (status === "resolved") {
+    if (!afterFixImageUrl) {
+      throw new ApiError(400, "After-fix image is required to resolve complaint");
+    }
+
+    complaint.afterFixImageUrl = afterFixImageUrl;
+    complaint.resolvedAt = new Date();
+  }
+
+  await complaint.save();
+
+  res.json(
+    new ApiResponse(200, complaint, "Complaint updated successfully")
+  );
+});
+
+// Delete Complaint
+
+export const deleteComplaint = asyncHandler(async (req, res) => {
+  const user = req.user;
+  const { complaintId } = req.params;
+
+  if (user.role !== "authority") {
+    throw new ApiError(403, "Only municipal admins can delete complaints");
+  }
+
+  const complaint = await Complaint.findByIdAndDelete(complaintId);
+
+  if (!complaint) {
+    throw new ApiError(404, "Complaint not found");
+  }
+
+  res.json(
+    new ApiResponse(200, null, "Complaint deleted successfully")
+  );
+});
