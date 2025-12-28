@@ -4,6 +4,8 @@ import cookieParser from "cookie-parser";
 import authRoutes from "./routes/auth.routes.js";
 import complaintRoutes from "./routes/complaint.routes.js"
 import wardRoutes from "./routes/ward.routes.js"
+import voteRoutes from "./routes/vote.routes.js"
+import adminRoutes from "./routes/admin.routes.js"
 
 const app = express();
 
@@ -23,6 +25,8 @@ app.use(cookieParser());
 app.use("/api/auth", authRoutes);
 app.use("/api/complaint", complaintRoutes);
 app.use("/api/ward", wardRoutes);
+app.use("/api", voteRoutes);
+app.use("/api/admin", adminRoutes);
 app.get("/", (req, res) => {
   res.send({ message: "Backend is running!" });
 });
