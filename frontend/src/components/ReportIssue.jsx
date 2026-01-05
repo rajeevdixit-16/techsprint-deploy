@@ -1,64 +1,107 @@
-import { useState } from 'react';
-import { ArrowLeft, Camera, MapPin, AlertCircle, CheckCircle } from 'lucide-react';
-import { Button } from './Button';
-import { Card } from './Card';
-import { Badge } from './Badge';
-import { categories } from '../data/mockData';
+import { useState, useEffect } from "react";
+import {
+  ArrowLeft,
+  Camera,
+  MapPin,
+  AlertCircle,
+  CheckCircle,
+  RefreshCw,
+  LocateFixed,
+  X,
+} from "lucide-react";
+import { Button } from "./Button";
+import { Card } from "./Card";
+import { Badge } from "./Badge";
+import { categories } from "../data/mockData";
+import { useAppStore } from "../store/useAppStore";
 
 export function ReportIssue() {
   const navigate = useAppStore((state) => state.navigate);
+  const selectedLocation = useAppStore((state) => state.selectedLocation);
 
-  const [step, setStep] = useState(1);
-  const [description, setDescription] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [urgency, setUrgency] = useState('medium');
+  // 1. Core State Initialization
   const [image, setImage] = useState(null);
-  const [submitted, setSubmitted] = useState(false);
+  // Dynamically start at Step 2 if location is already captured from the map
+  const [step, setStep] = useState(selectedLocation ? 2 : 1);
 
+  const [description, setDescription] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [urgency, setUrgency] = useState("medium");
+  const [submitted, setSubmitted] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
+
+  // 2. Memory Cleanup for Image Preview
+  useEffect(() => {
+    return () => {
+      if (image && image.startsWith("blob:")) {
+        URL.revokeObjectURL(image);
+      }
+    };
+  }, [image]);
+
+  // 3. Handlers
   const handleImageUpload = (e) => {
     const file = e.target.files && e.target.files[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImage(reader.result);
-        setStep(2);
-      };
-      reader.readAsDataURL(file);
+      // FIX: Use createObjectURL for instant, synchronous preview
+      const previewUrl = URL.createObjectURL(file);
+      setImage(previewUrl);
+      setStep(2);
+    }
+  };
+
+  const handleDetectLocation = () => {
+    setIsLocating(true);
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          navigate("report-issue", { lat: latitude, lng: longitude });
+          setIsLocating(false);
+        },
+        () => {
+          alert("Could not detect location. Please use the map.");
+          setIsLocating(false);
+        }
+      );
     }
   };
 
   const handleSubmit = () => {
     setSubmitted(true);
     setTimeout(() => {
-      navigate('citizen-dashboard');
-    }, 2000);
+      navigate("citizen-dashboard");
+    }, 3000);
   };
 
+  // SUCCESS VIEW
   if (submitted) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-6">
-        <Card className="max-w-md w-full p-8 text-center dark:border-slate-800">
-          <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4 dark:border dark:border-green-500/30 dark:shadow-lg dark:shadow-green-500/20">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-6 transition-all duration-500">
+        <Card className="max-w-md w-full p-8 text-center dark:border-slate-800 shadow-2xl">
+          <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4 dark:border dark:border-green-500/30">
             <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
           </div>
-          <h2 className="text-slate-900 dark:text-white mb-2">
-            Issue Reported Successfully!
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
+            Report Submitted!
           </h2>
-          <p className="text-slate-600 dark:text-slate-400 mb-6">
-            Your report has been submitted. Our AI is analyzing it and will assign priority shortly.
+          <p className="text-slate-600 dark:text-slate-400 mb-6 text-sm">
+            Our AI is cross-referencing your coordinates with Ward boundaries to
+            assign a response team.
           </p>
-          <div className="p-4 bg-blue-50 dark:bg-cyan-900/30 rounded-lg text-left dark:border dark:border-cyan-500/30">
-            <div className="text-blue-900 dark:text-cyan-300 mb-2">
-              AI Analysis Complete
-            </div>
-            <div className="space-y-2 text-blue-700 dark:text-cyan-400">
+          <div className="p-4 bg-blue-50/50 dark:bg-cyan-900/10 rounded-2xl text-left border border-blue-100 dark:border-cyan-500/20">
+            <div className="space-y-2 text-xs">
               <div className="flex justify-between">
-                <span>Category:</span>
-                <Badge>{selectedCategory || 'Road Damage'}</Badge>
+                <span className="text-slate-500">Latitude:</span>
+                <span className="font-mono text-blue-600 dark:text-cyan-400 font-bold">
+                  {selectedLocation?.lat.toFixed(6)}
+                </span>
               </div>
               <div className="flex justify-between">
-                <span>Priority:</span>
-                <Badge priority={urgency} />
+                <span className="text-slate-500">Longitude:</span>
+                <span className="font-mono text-blue-600 dark:text-cyan-400 font-bold">
+                  {selectedLocation?.lng.toFixed(6)}
+                </span>
               </div>
             </div>
           </div>
@@ -68,267 +111,266 @@ export function ReportIssue() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center gap-4">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col">
+      <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 sticky top-0 z-50 px-6 py-4">
+        <div className="max-w-4xl mx-auto flex items-center gap-4">
           <button
-            onClick={() => navigate('citizen-dashboard')}
-            className="flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-cyan-400"
+            onClick={() => navigate("map-view")}
+            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-all text-slate-600 dark:text-slate-400"
           >
             <ArrowLeft className="w-5 h-5" />
-            Back
           </button>
-          <h1 className="text-slate-900 dark:text-white">Report New Issue</h1>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white">
+            Report New Issue
+          </h1>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-6 py-8">
-        {/* Progress Steps */}
+      <main className="max-w-3xl mx-auto px-6 py-10 w-full flex-1">
+        {/* Stepper */}
         <div className="flex items-center justify-center gap-4 mb-12">
-          <div className="flex items-center gap-2">
-            <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                step >= 1 ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'
-              }`}
-            >
-              1
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex items-center">
+              <div
+                className={`w-10 h-10 rounded-2xl flex items-center justify-center text-sm font-bold transition-all ${
+                  step >= i
+                    ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30"
+                    : "bg-slate-200 dark:bg-slate-800 text-slate-400"
+                }`}
+              >
+                {i}
+              </div>
+              {i < 3 && (
+                <div
+                  className={`w-12 h-1 mx-2 rounded-full ${
+                    step > i ? "bg-blue-600" : "bg-slate-200 dark:bg-slate-800"
+                  }`}
+                />
+              )}
             </div>
-            <span className={step >= 1 ? 'text-slate-900' : 'text-slate-600'}>
-              Upload Photo
-            </span>
-          </div>
-          <div className="w-16 h-px bg-slate-200"></div>
-          <div className="flex items-center gap-2">
-            <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                step >= 2 ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'
-              }`}
-            >
-              2
-            </div>
-            <span className={step >= 2 ? 'text-slate-900' : 'text-slate-600'}>
-              Describe Issue
-            </span>
-          </div>
-          <div className="w-16 h-px bg-slate-200"></div>
-          <div className="flex items-center gap-2">
-            <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                step >= 3 ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'
-              }`}
-            >
-              3
-            </div>
-            <span className={step >= 3 ? 'text-slate-900' : 'text-slate-600'}>
-              Review & Submit
-            </span>
-          </div>
+          ))}
         </div>
 
-        {/* Step 1: Upload Image */}
+        {/* STEP 1: INITIAL UPLOAD (Visible if no image exists) */}
         {step === 1 && (
-          <Card className="p-12">
-            <div className="text-center">
-              <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Camera className="w-10 h-10 text-blue-600" />
+          <div className="space-y-6 animate-in fade-in duration-500">
+            {selectedLocation && (
+              <div className="flex items-center justify-center gap-2 py-2 px-4 bg-blue-600/10 border border-blue-500/20 rounded-full w-fit mx-auto shadow-sm">
+                <MapPin className="w-3.5 h-3.5 text-blue-500" />
+                <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest">
+                  Location Locked: {selectedLocation.lat.toFixed(4)},{" "}
+                  {selectedLocation.lng.toFixed(4)}
+                </span>
               </div>
-              <h2 className="text-slate-900 dark:text-white mb-2">
-                Upload Photo of the Issue
+            )}
+            <Card className="p-16 text-center border-dashed border-2 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50">
+              <div className="w-20 h-20 bg-blue-100 dark:bg-blue-900/30 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                <Camera className="w-10 h-10 text-blue-600 dark:text-blue-400" />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-3 tracking-tight">
+                Evidence Upload
               </h2>
-              <p className="text-slate-600 dark:text-slate-400 mb-8">
-                A clear photo helps authorities understand and resolve the issue faster
+              <p className="text-slate-500 dark:text-slate-400 mb-8 max-w-sm mx-auto text-sm leading-relaxed">
+                Upload a clear photo. AI will scan the image to verify
+                authenticity and classify the issue.
               </p>
-              <label className="inline-block">
+              <label htmlFor="file-upload" className="cursor-pointer">
                 <input
+                  id="file-upload"
                   type="file"
                   accept="image/*"
                   onChange={handleImageUpload}
                   className="hidden"
                 />
-                <Button size="lg" as="span">
-                  <Camera className="w-5 h-5" />
-                  Choose Photo
-                </Button>
-              </label>
-            </div>
-          </Card>
-        )}
-
-        {/* Step 2: Describe Issue */}
-        {step === 2 && (
-          <div className="space-y-6">
-            {image && (
-              <Card className="p-6">
-                <img
-                  src={image}
-                  alt="Uploaded issue"
-                  className="w-full h-64 object-cover rounded-lg"
-                />
-              </Card>
-            )}
-
-            <Card className="p-6">
-              <label className="block mb-4">
-                <span className="text-slate-900 dark:text-white mb-2 block">
-                  Describe the issue
-                </span>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Provide details about the location, severity, and any safety concerns..."
-                  rows={4}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                />
-              </label>
-
-              <div className="mb-4">
-                <span className="text-slate-900 dark:text-white mb-2 block">
-                  Category (optional)
-                </span>
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">AI will detect automatically</option>
-                  {categories.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="mb-6">
-                <span className="text-slate-900 dark:text-white mb-3 block">
-                  Urgency Level
-                </span>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setUrgency('low')}
-                    className={`flex-1 py-3 px-4 rounded-lg border-2 transition-colors ${
-                      urgency === 'low'
-                        ? 'border-green-500 bg-green-50 text-green-700'
-                        : 'border-slate-200 text-slate-600 hover:border-slate-300'
-                    }`}
-                  >
-                    Low
-                  </button>
-                  <button
-                    onClick={() => setUrgency('medium')}
-                    className={`flex-1 py-3 px-4 rounded-lg border-2 transition-colors ${
-                      urgency === 'medium'
-                        ? 'border-yellow-500 bg-yellow-50 text-yellow-700'
-                        : 'border-slate-200 text-slate-600 hover:border-slate-300'
-                    }`}
-                  >
-                    Medium
-                  </button>
-                  <button
-                    onClick={() => setUrgency('high')}
-                    className={`flex-1 py-3 px-4 rounded-lg border-2 transition-colors ${
-                      urgency === 'high'
-                        ? 'border-red-500 bg-red-50 text-red-700'
-                        : 'border-slate-200 text-slate-600 hover:border-slate-300'
-                    }`}
-                  >
-                    High
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3 p-4 bg-slate-50 rounded-lg mb-6">
-                <MapPin className="w-5 h-5 text-slate-600 mt-0.5" />
-                <div>
-                  <div className="text-slate-900 mb-1">Auto-detected Location</div>
-                  <div className="text-slate-600">
-                    Main Street, Andheri West, Mumbai
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex gap-3">
-                <Button variant="outline" onClick={() => setStep(1)}>
-                  Back
-                </Button>
                 <Button
-                  onClick={() => setStep(3)}
-                  disabled={!description.trim()}
-                  className="flex-1"
+                  size="lg"
+                  as="span"
+                  className="px-10 py-6 rounded-2xl shadow-xl pointer-events-none"
                 >
-                  Continue to Review
+                  <Camera className="w-5 h-5 mr-3" /> Capture / Choose Photo
                 </Button>
-              </div>
+              </label>
             </Card>
           </div>
         )}
 
-        {/* Step 3: Review & Submit */}
-        {step === 3 && (
-          <div className="space-y-6">
-            <Card className="p-6">
-              <h2 className="text-slate-900 dark:text-white mb-4">
-                Review Your Report
-              </h2>
+        {/* STEP 2: VERIFICATION & DETAILS */}
+        {step === 2 && (
+          <div className="space-y-6 animate-in slide-in-from-bottom-8 duration-500">
+            <Card className="p-6 dark:border-slate-800 border-2 border-blue-500/20 shadow-xl">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-blue-600" /> Spatial
+                Verification
+              </h3>
+              {selectedLocation ? (
+                <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800">
+                  <div className="flex items-center gap-3 text-sm font-mono font-bold dark:text-white">
+                    <CheckCircle className="w-4 h-4 text-green-500" />
+                    {selectedLocation.lat.toFixed(6)},{" "}
+                    {selectedLocation.lng.toFixed(6)}
+                  </div>
+                  <button
+                    onClick={() => navigate("map-view")}
+                    className="text-blue-600 dark:text-blue-400 text-xs font-bold flex items-center gap-1 hover:underline"
+                  >
+                    <RefreshCw className="w-3 h-3" /> Change Pin
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Button
+                    variant="outline"
+                    className="h-16 flex flex-col gap-1 border-2"
+                    onClick={handleDetectLocation}
+                    disabled={isLocating}
+                  >
+                    <LocateFixed
+                      className={`w-4 h-4 ${isLocating ? "animate-spin" : ""}`}
+                    />
+                    <span className="text-[10px] font-bold uppercase">
+                      {isLocating ? "Detecting..." : "GPS Detect"}
+                    </span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-16 flex flex-col gap-1 border-2"
+                    onClick={() => navigate("map-view")}
+                  >
+                    <MapPin className="w-4 h-4" />
+                    <span className="text-[10px] font-bold uppercase">
+                      Map Selector
+                    </span>
+                  </Button>
+                </div>
+              )}
+            </Card>
 
-              {image && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+              <Card className="p-2 relative group dark:border-slate-800 overflow-hidden rounded-3xl shadow-xl bg-slate-100 dark:bg-slate-900 min-h-[300px] flex items-center justify-center">
+                {image ? (
+                  <img
+                    src={image}
+                    className="w-full h-full object-cover rounded-2xl aspect-square transition-transform duration-700 group-hover:scale-110"
+                    alt="Preview"
+                  />
+                ) : (
+                  <div className="text-center text-slate-400">
+                    <Camera className="w-10 h-10 mb-2 opacity-20 mx-auto" />
+                    <label
+                      htmlFor="file-upload-2"
+                      className="cursor-pointer text-xs font-bold text-blue-600 hover:underline"
+                    >
+                      <input
+                        id="file-upload-2"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="hidden"
+                      />
+                      Add Photo
+                    </label>
+                  </div>
+                )}
+                {image && (
+                  <button
+                    onClick={() => {
+                      setImage(null);
+                      setStep(1);
+                    }}
+                    className="absolute top-4 right-4 bg-red-500 text-white p-2 rounded-full shadow-2xl opacity-0 group-hover:opacity-100 transition-all hover:scale-110"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </Card>
+
+              <Card className="p-7 dark:border-slate-800 shadow-xl rounded-3xl space-y-4">
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                  Issue Description
+                </label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Tell the Ward Officer exactly what is happening..."
+                  className="w-full bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl text-sm border border-slate-100 dark:border-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition-all min-h-[160px]"
+                />
+                <Button
+                  className="w-full h-14 mt-4 shadow-2xl shadow-blue-500/20 font-bold text-lg rounded-2xl"
+                  disabled={!description.trim() || !selectedLocation || !image}
+                  onClick={() => setStep(3)}
+                >
+                  Review & Submit
+                </Button>
+                {(!selectedLocation || !image) && description.trim() && (
+                  <p className="text-[10px] text-red-500 mt-2 text-center font-bold italic animate-pulse">
+                    * Photo and Location are required to proceed
+                  </p>
+                )}
+              </Card>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 3: FINAL REVIEW */}
+        {step === 3 && (
+          <div className="space-y-6 animate-in zoom-in-95 duration-300">
+            <Card className="p-8 dark:border-slate-800 rounded-[2.5rem] shadow-2xl border-none overflow-hidden">
+              <h2 className="font-black text-2xl dark:text-white mb-6 tracking-tighter italic">
+                Submission Audit
+              </h2>
+              <div className="flex flex-col md:flex-row gap-8 items-start">
                 <img
                   src={image}
-                  alt="Issue"
-                  className="w-full h-64 object-cover rounded-lg mb-4"
+                  className="w-40 h-40 object-cover rounded-[2rem] shadow-2xl border-4 border-white dark:border-slate-800"
+                  alt="Final Review"
                 />
-              )}
-
-              <div className="space-y-4">
-                <div>
-                  <div className="text-slate-600 dark:text-slate-400 mb-1">
-                    Description
+                <div className="flex-1 space-y-6">
+                  <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+                      Description
+                    </p>
+                    <p className="text-base text-slate-700 dark:text-slate-300 font-medium leading-relaxed">
+                      "{description}"
+                    </p>
                   </div>
-                  <div className="text-slate-900 dark:text-white">
-                    {description}
-                  </div>
-                </div>
-
-                <div className="flex gap-4">
-                  <div className="flex-1">
-                    <div className="text-slate-600 dark:text-slate-400 mb-1">
-                      Location
-                    </div>
-                    <div className="flex items-center gap-2 text-slate-900 dark:text-white">
-                      <MapPin className="w-4 h-4" />
-                      Main Street, Andheri West, Mumbai
-                    </div>
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-slate-600 dark:text-slate-400 mb-1">
-                      Urgency
-                    </div>
-                    <Badge priority={urgency} />
+                  <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-cyan-400 rounded-xl font-mono text-xs font-bold w-fit border border-blue-100 dark:border-blue-900/30">
+                    <MapPin size={14} />
+                    {selectedLocation.lat.toFixed(5)},{" "}
+                    {selectedLocation.lng.toFixed(5)}
                   </div>
                 </div>
               </div>
             </Card>
 
-            <Card className="p-6 bg-blue-50 border-blue-200">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5" />
+            <Card className="p-6 bg-blue-600 text-white shadow-2xl shadow-blue-600/30 rounded-3xl border-none">
+              <div className="flex gap-4">
+                <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-sm self-start">
+                  <AlertCircle className="w-6 h-6" />
+                </div>
                 <div>
-                  <div className="text-blue-900 mb-1">AI Analysis Preview</div>
-                  <div className="text-blue-700">
-                    Our AI will automatically classify this issue and assign priority
-                    based on severity, location impact, and historical patterns.
-                    You'll receive updates via notifications.
-                  </div>
+                  <p className="font-bold text-lg">Spatial Cross-Reference</p>
+                  <p className="text-xs text-blue-100 mt-1 leading-relaxed opacity-90">
+                    Our GIS system will cross-reference these coordinates with
+                    the Lucknow Ward database. Upon confirmation, the report
+                    will be pushed to the relevant Officer's dashboard.
+                  </p>
                 </div>
               </div>
             </Card>
 
-            <div className="flex gap-3">
-              <Button variant="outline" onClick={() => setStep(2)}>
-                Back to Edit
+            <div className="flex gap-4 pt-6 pb-10">
+              <Button
+                variant="outline"
+                onClick={() => setStep(2)}
+                className="flex-1 h-14 rounded-2xl font-bold border-2"
+              >
+                Edit Details
               </Button>
-              <Button onClick={handleSubmit} className="flex-1">
-                Submit Report
+              <Button
+                onClick={handleSubmit}
+                className="flex-[2] h-14 text-xl font-black rounded-2xl shadow-2xl shadow-blue-600/40 tracking-tight"
+              >
+                Confirm & Send Report
               </Button>
             </div>
           </div>

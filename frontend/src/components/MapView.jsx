@@ -1,199 +1,236 @@
-import { useState } from 'react';
-import { Filter, X, ArrowLeft } from 'lucide-react';
-import { Header } from './Header';
-import { Card } from './Card';
-import { Badge } from './Badge';
-import { Button } from './Button';
-import { mockIssues, categories } from '../data/mockData';
-import { useAppStore } from '../store/useAppStore';
-import { useAuthStore } from '../store/useAuthStore';
+import { useState, useMemo } from "react";
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  useMap,
+  useMapEvents,
+  LayersControl,
+} from "react-leaflet";
+import L from "leaflet";
+import { Filter, X, MapPin, List, Navigation } from "lucide-react";
+
+import { Header } from "./Header";
+import { Card } from "./Card";
+import { Badge } from "./Badge";
+import { Button } from "./Button";
+
+import { mockIssues, categories } from "../data/mockData";
+import { useAppStore } from "../store/useAppStore";
+import { useAuthStore } from "../store/useAuthStore";
+
+import "leaflet/dist/leaflet.css";
+
+// --- Sub-Component: Map Events Handler ---
+function MapClickHandler({ onLocationSelect }) {
+  useMapEvents({
+    click(e) {
+      const { lat, lng } = e.latlng;
+      onLocationSelect(lat, lng);
+    },
+  });
+  return null;
+}
+
+// --- Sub-Component: Map Controller ---
+function MapController({ center }) {
+  const map = useMap();
+  if (center) {
+    map.flyTo(center, 15, { duration: 1.5 });
+  }
+  return null;
+}
+
+// Custom Marker styling
+const createCustomIcon = (color) =>
+  new L.DivIcon({
+    className: "custom-marker",
+    html: `<div style="
+    background-color: ${color}; 
+    width: 20px; 
+    height: 20px; 
+    border-radius: 50%; 
+    border: 3px solid white; 
+    box-shadow: 0 0 10px rgba(0,0,0,0.3);"></div>`,
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
+  });
 
 export function MapView() {
   const [selectedIssue, setSelectedIssue] = useState(null);
+  const [newIssueLocation, setNewIssueLocation] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
-  const [filterCategory, setFilterCategory] = useState('');
-  const [filterPriority, setFilterPriority] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
+  const [filterCategory, setFilterCategory] = useState("");
+  const [filterPriority, setFilterPriority] = useState("");
 
   const navigate = useAppStore((state) => state.navigate);
   const viewIssue = useAppStore((state) => state.viewIssue);
-
   const userRole = useAuthStore((state) => state.userRole);
   const logout = useAuthStore((state) => state.logout);
 
-  const filteredIssues = mockIssues.filter(issue => {
-    if (filterCategory && issue.category !== filterCategory) return false;
-    if (filterPriority && issue.priority !== filterPriority) return false;
-    if (filterStatus && issue.status !== filterStatus) return false;
-    return true;
-  });
+  const defaultCenter = [26.8467, 80.9462]; // Lucknow
+
+  const filteredIssues = useMemo(() => {
+    return mockIssues.filter((issue) => {
+      if (filterCategory && issue.category !== filterCategory) return false;
+      if (filterPriority && issue.priority !== filterPriority) return false;
+      return true;
+    });
+  }, [filterCategory, filterPriority]);
 
   const getPriorityColor = (priority) => {
     switch (priority) {
-      case 'high': return '#ef4444';
-      case 'medium': return '#f59e0b';
-      case 'low': return '#22c55e';
-      default: return '#22c55e';
+      case "high":
+        return "#ef4444";
+      case "medium":
+        return "#f59e0b";
+      case "low":
+        return "#22c55e";
+      default:
+        return "#3b82f6";
     }
   };
 
+  const handleLocationSelect = (lat, lng) => {
+    setNewIssueLocation({ lat, lng });
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col">
-      {userRole ? (
-        <Header 
-          userRole={userRole} 
-          onLogout={logout}
-          onNavigate={navigate}
-        />
-      ) : (
-        <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200/60 dark:border-slate-700/60 sticky top-0 z-50 shadow-sm">
-          <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-8">
-              <button 
-                onClick={() => navigate('landing')}
-                className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-              >
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 dark:from-cyan-500 dark:to-purple-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-600/20 dark:shadow-cyan-500/50">
-                  <span className="text-white">CF</span>
-                </div>
-                <span className="text-slate-900 dark:text-white">CivicFix AI</span>
-              </button>
-            </div>
-            
-            <div className="flex items-center gap-4">
-              <Button 
-                variant="ghost" 
-                onClick={() => navigate('landing')}
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Back to Home
-              </Button>
-              <Button variant="ghost" onClick={() => navigate('login')}>
-                Sign In
-              </Button>
-              <Button onClick={() => navigate('signup')}>
-                Get Started
-              </Button>
-            </div>
-          </div>
-        </header>
-      )}
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col overflow-hidden text-slate-900 dark:text-slate-100">
+      <Header userRole={userRole} onLogout={logout} onNavigate={navigate} />
 
-      <div className="flex-1 flex">
-        {/* Map Area */}
-        <div className="flex-1 relative bg-slate-200 dark:bg-slate-900">
-          {/* Mock Map */}
-          <div className="absolute inset-0 bg-slate-100 dark:bg-slate-950">
-            <svg className="w-full h-full">
-              {/* Grid pattern for map background */}
-              <defs>
-                <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                  <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#e2e8f0" className="dark:stroke-slate-800" strokeWidth="1"/>
-                </pattern>
-              </defs>
-              <rect width="100%" height="100%" fill="url(#grid)" />
-              
-              {/* Issue markers */}
-              {filteredIssues.map((issue, index) => {
-                const x = 20 + (index * 80) % 800;
-                const y = 100 + (Math.floor(index / 10) * 120);
-                return (
-                  <g 
-                    key={issue.id}
-                    transform={`translate(${x}, ${y})`}
-                    className="cursor-pointer"
-                    onClick={() => setSelectedIssue(issue)}
-                  >
-                    <circle
-                      cx="0"
-                      cy="0"
-                      r="20"
-                      fill={getPriorityColor(issue.priority)}
-                      opacity="0.3"
-                    />
-                    <circle
-                      cx="0"
-                      cy="0"
-                      r="12"
-                      fill={getPriorityColor(issue.priority)}
-                    />
-                    <text
-                      x="0"
-                      y="0"
-                      textAnchor="middle"
-                      dominantBaseline="central"
-                      fill="white"
-                      className="text-xs"
-                    >
-                      {issue.id}
-                    </text>
-                  </g>
-                );
-              })}
-            </svg>
-          </div>
+      <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 relative z-0">
+          <MapContainer
+            center={defaultCenter}
+            zoom={13}
+            zoomControl={false}
+            style={{ height: "100%", width: "100%" }}
+          >
+            <LayersControl position="topright">
+              <LayersControl.BaseLayer checked name="Street View">
+                <TileLayer
+                  url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+                  attribution='&copy; <a href="https://carto.com/">CARTO</a>'
+                />
+              </LayersControl.BaseLayer>
 
-          {/* Filter Button */}
-          <div className="absolute top-4 left-4">
-            <Button onClick={() => setShowFilters(!showFilters)}>
-              <Filter className="w-4 h-4" />
-              Filters
-              {(filterCategory || filterPriority || filterStatus) && (
-                <span className="w-2 h-2 bg-blue-400 rounded-full"></span>
-              )}
+              <LayersControl.BaseLayer name="Satellite View">
+                <TileLayer
+                  url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                  attribution="Tiles &copy; Esri"
+                />
+              </LayersControl.BaseLayer>
+            </LayersControl>
+
+            <MapController
+              center={
+                selectedIssue
+                  ? [selectedIssue.location.lat, selectedIssue.location.lng]
+                  : null
+              }
+            />
+
+            <MapClickHandler onLocationSelect={handleLocationSelect} />
+
+            {filteredIssues.map((issue) => (
+              <Marker
+                key={issue.id}
+                position={[issue.location.lat, issue.location.lng]}
+                icon={createCustomIcon(getPriorityColor(issue.priority))}
+                eventHandlers={{ click: () => setSelectedIssue(issue) }}
+              />
+            ))}
+
+            {newIssueLocation && (
+              <Marker
+                position={[newIssueLocation.lat, newIssueLocation.lng]}
+                icon={createCustomIcon("#3b82f6")}
+              />
+            )}
+          </MapContainer>
+
+          <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-2">
+            <Button
+              onClick={() => setShowFilters(!showFilters)}
+              className="bg-white/90 dark:bg-slate-800/90 backdrop-blur shadow-lg border-none hover:bg-white dark:hover:bg-slate-700 transition-all"
+              variant="secondary"
+            >
+              <Filter className="w-4 h-4 mr-2" /> Filters
             </Button>
           </div>
 
-          {/* Legend */}
-          <Card className="absolute bottom-4 left-4 p-4 dark:border-slate-800">
-            <div className="text-slate-900 dark:text-white mb-3">Priority Levels</div>
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-red-500 dark:shadow-sm dark:shadow-red-500/50"></div>
-                <span className="text-slate-700 dark:text-slate-300">High Priority</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-yellow-500 dark:shadow-sm dark:shadow-yellow-500/50"></div>
-                <span className="text-slate-700 dark:text-slate-300">Medium Priority</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-green-500 dark:shadow-sm dark:shadow-green-500/50"></div>
-                <span className="text-slate-700 dark:text-slate-300">Low Priority</span>
-              </div>
-            </div>
-          </Card>
-
-          {/* Filter Panel */}
-          {showFilters && (
-            <Card className="absolute top-20 left-4 w-80 p-6 dark:border-slate-800">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-slate-900 dark:text-white">Filter Issues</h3>
-                <button onClick={() => setShowFilters(false)}>
-                  <X className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+          {newIssueLocation && (
+            <Card className="absolute bottom-6 left-6 p-5 z-[1001] bg-white/95 dark:bg-slate-900/95 backdrop-blur border-blue-500 border-2 w-72 shadow-2xl animate-in fade-in slide-in-from-bottom-6">
+              <div className="flex justify-between items-start mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                    <Navigation className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <p className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-tight">
+                    Location Captured
+                  </p>
+                </div>
+                <button
+                  onClick={() => setNewIssueLocation(null)}
+                  className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full"
+                >
+                  <X size={14} className="text-slate-500" />
                 </button>
               </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-4 font-mono bg-slate-50 dark:bg-slate-800 p-2 rounded-md">
+                {newIssueLocation.lat.toFixed(6)},{" "}
+                {newIssueLocation.lng.toFixed(6)}
+              </p>
+              <Button
+                size="sm"
+                className="w-full text-xs font-bold shadow-lg shadow-blue-500/20 bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-none"
+                onClick={() => navigate("report-issue", newIssueLocation)}
+              >
+                Report at this spot
+              </Button>
+            </Card>
+          )}
 
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-slate-700 dark:text-slate-300 mb-2">Category</label>
+          {showFilters && (
+            <Card className="absolute top-16 left-4 w-72 p-5 z-[1001] shadow-2xl border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur animate-in fade-in zoom-in duration-150">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-sm dark:text-white text-slate-900">
+                  Refine View
+                </h3>
+                <button
+                  onClick={() => setShowFilters(false)}
+                  className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full"
+                >
+                  <X size={16} className="text-slate-500" />
+                </button>
+              </div>
+              <div className="space-y-4 text-slate-900 dark:text-slate-100">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                    Category
+                  </label>
                   <select
+                    className="w-full p-2 text-sm rounded-md border dark:bg-slate-900 dark:border-slate-700 bg-white dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
                     value={filterCategory}
                     onChange={(e) => setFilterCategory(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 dark:bg-slate-900/50 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-cyan-500"
                   >
                     <option value="">All Categories</option>
-                    {categories.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
+                    {categories.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
                     ))}
                   </select>
                 </div>
-
-                <div>
-                  <label className="block text-slate-700 dark:text-slate-300 mb-2">Priority</label>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                    Priority
+                  </label>
                   <select
+                    className="w-full p-2 text-sm rounded-md border dark:bg-slate-900 dark:border-slate-700 bg-white dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
                     value={filterPriority}
                     onChange={(e) => setFilterPriority(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 dark:bg-slate-900/50 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-cyan-500"
                   >
                     <option value="">All Priorities</option>
                     <option value="high">High</option>
@@ -201,131 +238,113 @@ export function MapView() {
                     <option value="low">Low</option>
                   </select>
                 </div>
-
-                <div>
-                  <label className="block text-slate-700 dark:text-slate-300 mb-2">Status</label>
-                  <select
-                    value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 dark:bg-slate-900/50 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-cyan-500"
-                  >
-                    <option value="">All Statuses</option>
-                    <option value="submitted">Submitted</option>
-                    <option value="acknowledged">Acknowledged</option>
-                    <option value="in-progress">In Progress</option>
-                    <option value="resolved">Resolved</option>
-                  </select>
-                </div>
-
-                <Button 
-                  variant="outline" 
-                  className="w-full"
+                <Button
+                  variant="outline"
+                  className="w-full text-xs"
                   onClick={() => {
-                    setFilterCategory('');
-                    setFilterPriority('');
-                    setFilterStatus('');
+                    setFilterCategory("");
+                    setFilterPriority("");
                   }}
                 >
-                  Clear Filters
+                  Reset Filters
                 </Button>
               </div>
             </Card>
           )}
         </div>
 
-        {/* Side Panel */}
-        <div className="w-96 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 overflow-y-auto">
+        <div className="w-96 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex flex-col z-10 shadow-[-10px_0_30px_rgba(0,0,0,0.05)]">
           {selectedIssue ? (
-            <div className="p-6">
-              <div className="flex items-start justify-between mb-4">
-                <h3 className="text-slate-900 dark:text-white">{selectedIssue.title}</h3>
-                <button onClick={() => setSelectedIssue(null)}>
-                  <X className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+            <div className="p-6 overflow-y-auto animate-in slide-in-from-right duration-300">
+              <div className="flex items-center justify-between mb-6">
+                <Badge
+                  variant="outline"
+                  className="text-[10px] uppercase tracking-widest px-2.5 py-0.5"
+                >
+                  Case Detail
+                </Badge>
+                <button
+                  onClick={() => setSelectedIssue(null)}
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"
+                >
+                  <X size={18} className="text-slate-500" />
                 </button>
               </div>
 
-              {selectedIssue.image && (
-                <img 
-                  src={selectedIssue.image} 
-                  alt={selectedIssue.title}
-                  className="w-full h-48 object-cover rounded-lg mb-4 ring-1 ring-slate-200 dark:ring-slate-700"
-                />
-              )}
-
-              <div className="space-y-4 mb-6">
-                <div>
-                  <div className="text-slate-600 dark:text-slate-400 mb-1">Description</div>
-                  <div className="text-slate-900 dark:text-white">{selectedIssue.description}</div>
-                </div>
-
-                <div>
-                  <div className="text-slate-600 dark:text-slate-400 mb-1">Location</div>
-                  <div className="text-slate-900 dark:text-white">{selectedIssue.location.address}</div>
-                </div>
-
-                <div className="flex gap-4">
-                  <div className="flex-1">
-                    <div className="text-slate-600 dark:text-slate-400 mb-1">Category</div>
-                    <Badge>{selectedIssue.category}</Badge>
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-slate-600 dark:text-slate-400 mb-1">Priority</div>
-                    <Badge priority={selectedIssue.priority} />
-                  </div>
-                </div>
-
-                <div className="flex gap-4">
-                  <div className="flex-1">
-                    <div className="text-slate-600 dark:text-slate-400 mb-1">Status</div>
-                    <Badge status={selectedIssue.status} />
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-slate-600 dark:text-slate-400 mb-1">Upvotes</div>
-                    <div className="text-slate-900 dark:text-cyan-400">{selectedIssue.upvotes}</div>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-slate-600 dark:text-slate-400 mb-1">Reported By</div>
-                  <div className="text-slate-900 dark:text-white">{selectedIssue.reportedBy}</div>
-                </div>
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2 leading-tight">
+                {selectedIssue.title}
+              </h2>
+              <div className="flex items-center gap-1.5 text-slate-500 mb-6 font-medium">
+                <MapPin className="w-4 h-4 text-blue-500" />
+                <span className="text-xs truncate">
+                  {selectedIssue.location.address}
+                </span>
               </div>
 
-              <Button 
-                className="w-full"
-                onClick={() => viewIssue(selectedIssue)}
-              >
-                View Full Details
-              </Button>
+              <div className="space-y-5">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
+                    <p className="text-[10px] text-slate-400 font-bold uppercase mb-1.5 tracking-tight">
+                      Priority
+                    </p>
+                    <Badge priority={selectedIssue.priority} />
+                  </div>
+                  <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
+                    <p className="text-[10px] text-slate-400 font-bold uppercase mb-1.5 tracking-tight">
+                      Status
+                    </p>
+                    <Badge status={selectedIssue.status} />
+                  </div>
+                </div>
+
+                <div className="p-4 bg-blue-50/40 dark:bg-blue-900/10 rounded-2xl border border-blue-100/50 dark:border-blue-800/30">
+                  <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed italic">
+                    "{selectedIssue.description}"
+                  </p>
+                </div>
+
+                <Button
+                  className="w-full h-12 shadow-xl shadow-blue-500/20 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-all active:scale-[0.98]"
+                  onClick={() => viewIssue(selectedIssue)}
+                >
+                  View Full Case File
+                </Button>
+              </div>
             </div>
           ) : (
-            <div className="p-6">
-              <h3 className="text-slate-900 dark:text-white mb-4">
-                All Issues ({filteredIssues.length})
-              </h3>
-              <div className="space-y-3">
-                {filteredIssues.map(issue => (
+            <div className="flex flex-col h-full bg-slate-50/20 dark:bg-slate-950/20">
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                    Active Reports
+                  </h3>
+                  <p className="text-[11px] text-slate-400 font-medium">
+                    {filteredIssues.length} issues in view
+                  </p>
+                </div>
+                <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded-xl">
+                  <List className="w-5 h-5 text-slate-400" />
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {filteredIssues.map((issue) => (
                   <Card
                     key={issue.id}
-                    className="p-4 hover:shadow-sm dark:hover:shadow-cyan-500/10 dark:border-slate-800"
                     onClick={() => setSelectedIssue(issue)}
+                    className="p-4 rounded-2xl border-white dark:border-slate-800 bg-white dark:bg-slate-900 shadow-[0_4px_12px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:border-blue-300 dark:hover:border-blue-500/50 cursor-pointer transition-all active:scale-[0.97]"
                   >
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1 pr-2">
-                        <div className="text-slate-900 dark:text-white mb-1">
-                          {issue.title}
-                        </div>
-                        <div className="text-slate-600 dark:text-slate-400 text-sm line-clamp-2">
-                          {issue.description}
-                        </div>
-                      </div>
-                      <Badge priority={issue.priority} className="text-xs" />
-                    </div>
-                    <div className="flex items-center gap-2 mt-2">
-                      <Badge status={issue.status} className="text-xs" />
-                      <span className="text-slate-600 dark:text-slate-400 text-sm">
-                        {issue.upvotes} upvotes
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="font-bold text-sm line-clamp-1 flex-1 dark:text-white tracking-tight">
+                        {issue.title}
                       </span>
+                      <Badge
+                        priority={issue.priority}
+                        className="ml-2 scale-90 origin-right"
+                      />
+                    </div>
+                    <div className="flex items-center text-[10px] text-slate-400 font-medium">
+                      <MapPin className="w-3 h-3 mr-1 text-slate-300" />
+                      <span className="truncate">{issue.location.address}</span>
                     </div>
                   </Card>
                 ))}
