@@ -11,10 +11,16 @@ export const useAppStore = create((set) => ({
   // Selected issue for authority detail view or authority dashboard
   selectedIssue: null,
 
-  // Holds {lat, lng} captured for ward assignment
+  // Holds { lat, lng } captured for ward assignment
   selectedLocation: null,
 
-  // 1. ADD: Dynamic address for the Header (Replaces hardcoded Mumbai)
+  // 🆕 Persisted image preview (for UI only)
+  reportImage: null,
+
+  // 🆕 Persisted actual File object (for backend upload)
+  reportFile: null,
+
+  // Dynamic address for Header
   currentAddress: "Detecting Location...",
 
   /**
@@ -27,8 +33,7 @@ export const useAppStore = create((set) => ({
     })),
 
   /**
-   * 2. ADD: Action to update the human-readable address
-   * Call this from the MapView or Geolocation handler.
+   * Update human-readable address
    */
   setCurrentAddress: (address) =>
     set({
@@ -45,7 +50,7 @@ export const useAppStore = create((set) => ({
     }),
 
   /**
-   * Resets the selected issue context
+   * Reset selected issue
    */
   clearSelectedIssue: () =>
     set({
@@ -53,19 +58,54 @@ export const useAppStore = create((set) => ({
     }),
 
   /**
-   * Resets the location data after submission
-   */
-  clearSelectedLocation: () =>
-    set({
-      selectedLocation: null,
-      currentAddress: "Prayagraj, Uttar Pradesh", // Default reset location
-    }),
-
-  /**
-   * Manual update for location
+   * Location handlers
    */
   setSelectedLocation: (location) =>
     set({
       selectedLocation: location,
+    }),
+
+  clearSelectedLocation: () =>
+    set({
+      selectedLocation: null,
+      currentAddress: "Prayagraj, Uttar Pradesh",
+    }),
+
+  /**
+   * 🆕 Report image (preview)
+   */
+  setReportImage: (image) =>
+    set({
+      reportImage: image,
+    }),
+
+  clearReportImage: () =>
+    set({
+      reportImage: null,
+    }),
+
+  /**
+   * 🆕 Report file (actual File object)
+   */
+  setReportFile: (file) =>
+    set({
+      reportFile: file,
+    }),
+
+  clearReportFile: () =>
+    set({
+      reportFile: null,
+    }),
+
+  /**
+   * Reset full report context (after submit / cancel)
+   */
+  clearReportContext: () =>
+    set({
+      selectedLocation: null,
+      reportImage: null,
+      reportFile: null,
+      editingIssue: null,
+      currentAddress: "Prayagraj, Uttar Pradesh",
     }),
 }));
