@@ -24,7 +24,7 @@ app.use(cookieParser());
 
 app.use("/api/auth", authRoutes);
 app.use("/api/complaint", complaintRoutes);
-app.use("/api/ward", wardRoutes);
+app.use("/api/wards", wardRoutes);
 app.use("/api", voteRoutes);
 app.use("/api/admin", adminRoutes);
 app.get("/", (req, res) => {

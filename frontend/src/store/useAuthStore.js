@@ -3,7 +3,8 @@ import { loginUser,logoutUser } from '../services/auth.service.js';
 
 export const useAuthStore = create((set) => ({
   // Auth state
-  userRole: null, // 'citizen' | 'authority' | null
+  userRole: localStorage.getItem("role") || null, // 'citizen' | 'authority' | null
+
   isAuthenticated: false,
 
   // login: async ({ email, password }) => {

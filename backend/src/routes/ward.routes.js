@@ -1,10 +1,11 @@
-
+// routes/ward.routes.js
 import express from "express";
-import { createWard } from "../controllers/ward.controller.js";
-import auth  from "../middleware/auth.middleware.js";
+import { getWards } from "../controllers/ward.controller.js";
 
 const router = express.Router();
 
-router.post("/", auth, createWard);
+// GET /api/wards?city=Lucknow
+
+router.get("/", getWards);
 
 export default router;
