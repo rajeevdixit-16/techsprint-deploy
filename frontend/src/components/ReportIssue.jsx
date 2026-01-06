@@ -18,20 +18,22 @@ export function ReportIssue() {
   const selectedLocation = useAppStore((state) => state.selectedLocation);
   const editingIssue = useAppStore((state) => state.editingIssue);
 
-  // 1. Ref for hidden file input to ensure absolute button responsiveness
+  // 🔧 Image preview + real file (logic only, UI unchanged)
+  const image = useAppStore((state) => state.reportImage);
+  const setImage = useAppStore((state) => state.setReportImage);
+  const reportFile = useAppStore((state) => state.reportFile);
+  const setReportFile = useAppStore((state) => state.setReportFile);
+  const clearReportContext = useAppStore((state) => state.clearReportContext);
+
   const fileInputRef = useRef(null);
 
-  const [image, setImage] = useState(null);
   const [step, setStep] = useState(1);
   const [description, setDescription] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [hasNewImage, setHasNewImage] = useState(false);
 
-  /** * 2. LOCATION PRIORITY LOGIC
-   * This computed constant ensures the UI immediately reflects the map selection
-   * over the original report coordinates during an edit.
-   */
+  /** LOCATION PRIORITY LOGIC */
   const displayLat = selectedLocation?.lat ?? editingIssue?.location?.lat;
   const displayLng = selectedLocation?.lng ?? editingIssue?.location?.lng;
 
@@ -39,25 +41,18 @@ export function ReportIssue() {
     if (editingIssue) {
       setDescription(editingIssue.description);
       setImage(editingIssue.imageUrl);
+      setHasNewImage(false);
       setStep(2);
     } else if (selectedLocation) {
       setStep(2);
     }
-  }, [editingIssue, selectedLocation]);
-
-  useEffect(() => {
-    return () => {
-      if (image && image.startsWith("blob:")) {
-        URL.revokeObjectURL(image);
-      }
-    };
-  }, [image]);
+  }, [editingIssue, selectedLocation, setImage]);
 
   const handleImageUpload = (e) => {
     const file = e.target.files && e.target.files[0];
     if (file) {
-      const previewUrl = URL.createObjectURL(file);
-      setImage(previewUrl);
+      setReportFile(file);                    // ✅ REAL FILE (FIX)
+      setImage(URL.createObjectURL(file));    // preview (unchanged)
       setHasNewImage(true);
       setStep(2);
     }
@@ -69,16 +64,14 @@ export function ReportIssue() {
       const formData = new FormData();
       formData.append("description", description);
 
-      // Use prioritized location for the API request
       if (displayLat && displayLng) {
         formData.append("location[lat]", displayLat);
         formData.append("location[lng]", displayLng);
       }
 
-      if (hasNewImage && image.startsWith("blob:")) {
-        const response = await fetch(image);
-        const blob = await response.blob();
-        formData.append("image", blob, "report_update.jpg");
+      // ✅ REAL FILE SENT TO BACKEND (FIX)
+      if (reportFile) {
+        formData.append("image", reportFile);
       }
 
       if (editingIssue) {
@@ -88,14 +81,14 @@ export function ReportIssue() {
         );
         if (res.success) {
           setSubmitted(true);
-          useAppStore.setState({ editingIssue: null, selectedLocation: null });
+          clearReportContext();
           setTimeout(() => navigate("citizen-dashboard"), 2000);
         }
       } else {
         const res = await complaintService.createComplaint(formData);
         if (res.success) {
           setSubmitted(true);
-          useAppStore.setState({ selectedLocation: null });
+          clearReportContext();
           setTimeout(() => navigate("citizen-dashboard"), 3000);
         }
       }
@@ -129,10 +122,7 @@ export function ReportIssue() {
         <div className="max-w-4xl mx-auto flex items-center gap-4">
           <button
             onClick={() => {
-              useAppStore.setState({
-                editingIssue: null,
-                selectedLocation: null,
-              });
+              clearReportContext();
               navigate("citizen-dashboard");
             }}
             className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"
@@ -204,7 +194,7 @@ export function ReportIssue() {
                     Open Map Selector
                   </button>
                 </div>
-                {/* Dynamically prioritize the newest location data */}
+
                 <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl text-xs font-mono font-bold text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800">
                   <MapPin size={12} className="inline mr-1" />
                   {displayLat?.toFixed(4)}, {displayLng?.toFixed(4)}
@@ -219,6 +209,7 @@ export function ReportIssue() {
                   className="w-full bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl text-sm min-h-[140px] outline-none focus:ring-2 focus:ring-blue-500 border border-slate-100 dark:border-slate-800 dark:text-white transition-all"
                   placeholder="Describe the issue..."
                 />
+
                 <Button
                   className="w-full h-14 font-bold rounded-2xl shadow-xl"
                   onClick={() => setStep(3)}
