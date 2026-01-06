@@ -10,3 +10,7 @@ export const fetchWards = (city) => {
     params: { city }
   });
 };
+
+export const fetchCities = () => {
+  return api.get("/wards/cities");
+};

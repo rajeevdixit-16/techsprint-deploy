@@ -5,7 +5,7 @@ import { Card } from "./Card";
 import { useAppStore } from "../store/useAppStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { registerUser, loginUser } from "../services/auth.service";
-import { fetchWards } from "../services/ward.service";
+import { fetchWards, fetchCities } from "../services/ward.service";
 
 export function Login({ isSignup }) {
   const [email, setEmail] = useState("");
@@ -13,6 +13,7 @@ export function Login({ isSignup }) {
   const [role, setRole] = useState("citizen");
 
   const [city, setCity] = useState("");
+  const [cities, setCities] = useState([]);
   const [wardId, setWardId] = useState("");
   const [wards, setWards] = useState([]);
   const [wardLoading, setWardLoading] = useState(false);
@@ -22,27 +23,43 @@ export function Login({ isSignup }) {
   const navigate = useAppStore((state) => state.navigate);
   const setAuth = useAuthStore((state) => state.login);
 
+  /* =========================
+     FETCH CITIES (ON SIGNUP)
+  ========================= */
+  useEffect(() => {
+    if (isSignup && role === "authority") {
+      fetchCities()
+        .then((res) => {
+          setCities(res.data.data || []);
+        })
+        .catch(() => {
+          setCities([]);
+        });
+    }
+  }, [isSignup, role]);
+
+
   /* FETCH WARDS BASED ON CITY */
   useEffect(() => {
-  if (isSignup && role === "authority" && city) {
-    console.log("Fetching wards for city:", city); // 👈 ADD THIS
+    if (isSignup && role === "authority" && city) {
+      console.log("Fetching wards for city:", city); // 👈 ADD THIS
 
-    setWardLoading(true);
+      setWardLoading(true);
 
-    fetchWards(city)
-      .then((res) => {
-        console.log("Ward API response:", res.data); // 👈 ADD THIS
-        setWards(res.data.data || []);
-      })
-      .catch((err) => {
-        console.error("Ward fetch error:", err);
-        setWards([]);
-      })
-      .finally(() => {
-        setWardLoading(false);
-      });
-  }
-}, [city, role, isSignup]);
+      fetchWards(city)
+        .then((res) => {
+          console.log("Ward API response:", res.data); // 👈 ADD THIS
+          setWards(res.data.data || []);
+        })
+        .catch((err) => {
+          console.error("Ward fetch error:", err);
+          setWards([]);
+        })
+        .finally(() => {
+          setWardLoading(false);
+        });
+    }
+  }, [city, role, isSignup]);
 
 
   const handleSubmit = async (e) => {
@@ -120,11 +137,10 @@ export function Login({ isSignup }) {
                 key={r}
                 type="button"
                 onClick={() => setRole(r)}
-                className={`flex-1 py-2 rounded ${
-                  role === r
+                className={`flex-1 py-2 rounded ${role === r
                     ? "bg-blue-600 text-white"
                     : "bg-gray-200 dark:bg-slate-700"
-                }`}
+                  }`}
               >
                 {r}
               </button>
@@ -162,8 +178,11 @@ export function Login({ isSignup }) {
                 className="w-full p-2 rounded-md border bg-slate-100 dark:bg-slate-800"
               >
                 <option value="">Select City</option>
-                <option value="Lucknow">Lucknow</option>
-                <option value="Delhi">Delhi</option>
+                {cities.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
               </select>
             )}
 
@@ -191,8 +210,8 @@ export function Login({ isSignup }) {
               {loading
                 ? "Please wait..."
                 : isSignup
-                ? "Create Account"
-                : "Sign In"}
+                  ? "Create Account"
+                  : "Sign In"}
             </Button>
           </form>
         </Card>
