@@ -18,6 +18,8 @@ import { useAppStore } from "../store/useAppStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { complaintService } from "../services/complaint.service";
 
+import toast from "react-hot-toast";
+
 export function CitizenDashboard() {
   const [complaints, setComplaints] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -50,12 +52,13 @@ export function CitizenDashboard() {
    */
   const handleDelete = async (e, id) => {
     e.stopPropagation(); // Stop card from opening details
-    if (window.confirm("Delete this pothole report?")) {
+    if (window.confirm("Delete this report?")) {
       try {
         await complaintService.deleteComplaint(id);
+        toast.success("Report deleted successfully");
         setComplaints((prev) => prev.filter((item) => item._id !== id));
       } catch (err) {
-        alert("Failed to delete.");
+        toast.error(err.response?.data?.message || "Unable to delete this report")
       }
     }
   };
@@ -169,7 +172,7 @@ export function CitizenDashboard() {
                   <div className="flex justify-between items-start">
                     <div className="space-y-1">
                       <h3 className="text-xl font-bold">
-                        {issue.aiCategory?.toUpperCase() || "POTHOLE"}
+                        {issue.aiCategory?.toUpperCase()}
                       </h3>
                       <div className="flex gap-4 text-xs text-slate-500">
                         <span className="flex items-center gap-1">

@@ -42,6 +42,12 @@ const complaintSchema = new mongoose.Schema({
     // useful for giving priority score
     aiKeywords: [String],
 
+    aiStatus: {
+        type: String,
+        enum: ["ai","fallback"],
+        default: "ai",
+    },
+
     /* for prioity */
 
     priorityScore: {
