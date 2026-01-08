@@ -3,6 +3,8 @@ import Ward from "../models/ward.model.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
+import { fallbackClassify } from "../services/fallbackClassifier.js";
+import { validateDescription } from "../utils/validateDescription.js";
 
 // Services
 import { analyzeComplaintWithAI } from "../services/ai.service.js";
@@ -30,6 +32,15 @@ export const createComplaint = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Description, image and location are required");
   }
 
+  const isValidDescription = validateDescription(description);
+
+  if (!isValidDescription) {
+    throw new ApiError(
+      400,
+      "Please enter a relevant civic issue description"
+    );
+  }
+
   const lat = Number(location.lat);
   const lng = Number(location.lng);
 
@@ -46,16 +57,38 @@ export const createComplaint = asyncHandler(async (req, res) => {
 
   if (!ward) throw new ApiError(404, "Ward not found for this location");
 
-  let aiResult;
+  let aiCategory;
+  let aiSeverity;
+  let aiKeywords;
+  let aiStatus;
+
   try {
-    aiResult = await analyzeComplaintWithAI({ imageUrl, description });
+    const aiResult = await analyzeComplaintWithAI({ imageUrl, description });
+
+    // If AI explicitly returned fallback signal
+    if (aiResult?.fallback || aiResult?.error) {
+      const fallback = fallbackClassify(description);
+
+      aiCategory = fallback.category;
+      aiSeverity = fallback.severity;
+      aiKeywords = fallback.keywords;
+      aiStatus = "fallback";
+    } else {
+      aiCategory = aiResult.category;
+      aiSeverity = aiResult.severity;
+      aiKeywords = aiResult.keywords;
+      aiStatus = "ai";
+    }
   } catch (err) {
-    aiResult = {
-      category: "road",
-      severity: "medium",
-      keywords: ["manual_review_required"],
-    };
+
+    const fallback = fallbackClassify(description);
+
+    aiCategory = fallback.category;
+    aiSeverity = fallback.severity;
+    aiKeywords = fallback.keywords;
+    aiStatus = "fallback";
   }
+
 
   const complaint = await Complaint.create({
     reportedBy: user._id,
@@ -63,9 +96,10 @@ export const createComplaint = asyncHandler(async (req, res) => {
     imageUrl,
     location: { lat, lng },
     wardId: ward._id,
-    aiCategory: aiResult.category,
-    aiSeverity: aiResult.severity,
-    aiKeywords: aiResult.keywords,
+    aiCategory,
+    aiSeverity,
+    aiKeywords,
+    aiStatus,
   });
 
   complaint.priorityScore = calculatePriority(complaint);

@@ -50,7 +50,7 @@ export function CitizenDashboard() {
    */
   const handleDelete = async (e, id) => {
     e.stopPropagation(); // Stop card from opening details
-    if (window.confirm("Delete this pothole report?")) {
+    if (window.confirm("Delete this report?")) {
       try {
         await complaintService.deleteComplaint(id);
         setComplaints((prev) => prev.filter((item) => item._id !== id));
@@ -169,7 +169,7 @@ export function CitizenDashboard() {
                   <div className="flex justify-between items-start">
                     <div className="space-y-1">
                       <h3 className="text-xl font-bold">
-                        {issue.aiCategory?.toUpperCase() || "POTHOLE"}
+                        {issue.aiCategory?.toUpperCase()}
                       </h3>
                       <div className="flex gap-4 text-xs text-slate-500">
                         <span className="flex items-center gap-1">

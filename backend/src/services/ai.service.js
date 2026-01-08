@@ -78,10 +78,8 @@ Complaint description:
   } catch (error) {
     console.error("OpenAI Vision Failed:", error.message);
 
-    // Explicit signal to controller
     return {
-      error: true,
-      message: "Uploaded image is not a valid civic issue",
+      fallback: true,
     };
   }
 };
