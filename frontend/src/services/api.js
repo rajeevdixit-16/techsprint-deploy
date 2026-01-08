@@ -2,7 +2,7 @@ import axios from "axios";
 
 // Base configuration for the TechSprint backend
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:8000/api",
+  baseURL: import.meta.env.VITE_API_URL,
   withCredentials: false, // Set to true only if using Cookies instead of LocalStorage
 });
 
